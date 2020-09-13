@@ -54,18 +54,18 @@ fn uvarint(buf: []const u8) Varint {
 
     for (buf) |b, i| {
         if (b < 0x80) {
-            if (i > 9 or (i == 9 and b > 1)) {
+            if (i > 9 or i == 9 and b > 1) {
                 return Varint{
                     .value = 0,
                     .bytesRead = -i + 1,
                 };
             }
             return Varint{
-                .value = x | @as(u64, b) << s,
+                .value = x | (@as(u64, b) << s),
                 .bytesRead = i + 1,
             };
         }
-        x |= @as(u64, b & 0x7f) << s;
+        x |= (@as(u64, b & 0x7f) << s);
         s += 7;
     }
 
@@ -167,7 +167,7 @@ fn runDecode(dst: []u8, src: []const u8) u8 {
                 }
 
                 length = 4 + (@as(isize, src[s - 2]) >> 2 & 0x7);
-                offset = @as(isize, @as(u32, src[s - 2]) & 0xe0 << 3 | @as(u32, src[s - 1]));
+                offset = @as(isize, (@as(u32, src[s - 2]) & 0xe0) << 3 | @as(u32, src[s - 1]));
             },
             tagCopy2 => {
                 s += 3;
