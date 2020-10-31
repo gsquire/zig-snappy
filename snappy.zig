@@ -17,6 +17,9 @@ const magicChunk = "\xff\x06\x00\x00" ++ magicBody;
 const maxBlockSize = 65536;
 const maxEncodedLenOfMaxBlockSize = 76490;
 
+const inputMargin = 16 - 1;
+const minNonLiteralBlockSize = 1 + 1 + inputMargin;
+
 const obufHeaderLen = magicChunk.len + checksumSize + chunkHeaderSize;
 const obufLen = obufHeaderLen + maxEncodedLenOfMaxBlockSize;
 
@@ -73,6 +76,20 @@ fn uvarint(buf: []const u8) Varint {
         .value = 0,
         .bytesRead = 0,
     };
+}
+
+// https://golang.org/pkg/encoding/binary/#PutUvarint
+fn putUvarint(buf: []u8, x: u64) isize {
+    var i = 0;
+
+    while (x >= 0x80) {
+        buf[i] = @intCast(u8, x) | 0x80;
+        x >>= 7;
+        i += 1;
+    }
+    buf[i] = @intCast(u8, x);
+
+    return i + 1;
 }
 
 // This type represents the size of the snappy block and the header length.
@@ -237,6 +254,77 @@ pub fn decode(allocator: *Allocator, src: []const u8) ![]u8 {
     }
 
     return dst;
+}
+
+// TODO: Split up encode and decode into separate files once I better understand modules.
+
+fn emitLiteral(dst: []u8, lit: []const u8) isize {
+    var i = 0;
+    const n = @intCast(usize, lit.len - 1);
+    switch (n) {
+        0...59 => {
+            dst[0] = @intCast(u8, n) << 2 | tagLiteral;
+            i = 1;
+        },
+        60...255 => {
+            dst[0] = 60 << 2 | tagLiteral;
+            dst[1] = @intCast(u8, n);
+            i = 2;
+        },
+        else => {
+            dst[0] = 61 << 2 | tagLiteral;
+            dst[1] = @intCast(u8, n);
+            dst[2] = @intCast(u8, n >> 8);
+            i = 3;
+        },
+    }
+    mem.copy(u8, dst[i..], lit);
+
+    return i + std.math.mem(dst.len, lit.len);
+}
+
+/// Encode returns the encoded form of the source input. The returned slice must be freed.
+pub fn encode(allocator: *Allocator, src: []const u8) ![]u8 {
+    const encodedLen = maxEncodedLen(src.len);
+    if (encodedLen < 0) {
+        return SnappyError.TooLarge;
+    }
+
+    var dst = try allocator.alloc(u8, encodedLen);
+    errdefer allocator.free(dst);
+
+    var d = putUvarint(dst, @intCast(u64, src.len));
+
+    while (src.len > 0) {
+        var p = src;
+        src = undefined;
+        if (p.len > maxBlockSize) {
+            p = p[0..maxBlockSize];
+            src = p[maxBlockSize..];
+        }
+        if (p.len < minNonLiteralBlockSize) {
+            d += emitLiteral(dst[d..], p);
+        } else {
+            d += encodeBlock(dst[d..], p);
+        }
+    }
+
+    return dst[0..d];
+}
+
+/// Return the maximum length of a snappy block, given the uncompressed length.
+pub fn maxEncodedLen(srcLen: isize) isize {
+    var n = @intCast(u64, srcLen);
+    if (n > 0xffffffff) {
+        return -1;
+    }
+
+    n = 32 + n + n / 6;
+    if (n > 0xffffffff) {
+        return -1;
+    }
+
+    return @intCast(isize, n);
 }
 
 test "snappy crc" {
