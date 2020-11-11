@@ -13,5 +13,5 @@ jobs:
       - name: Zig test
         uses: goto-bus-stop/setup-zig@v1
         with:
-          version: 0.6.0
+          version: 0.7.0
       - run: make

@@ -60,7 +60,7 @@ fn uvarint(buf: []const u8) Varint {
             if (i > 9 or i == 9 and b > 1) {
                 return Varint{
                     .value = 0,
-                    .bytesRead = -i + 1,
+                    .bytesRead = -%i + 1,
                 };
             }
             return Varint{
