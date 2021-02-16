@@ -21,11 +21,16 @@ pub fn main() !void {
     const allocator = std.heap.page_allocator;
     const stdout = std.io.getStdOut().outStream();
 
-    const input = try readFile(allocator, "input");
-    defer allocator.free(input);
+    // const input = try readFile(allocator, "input");
+    // defer allocator.free(input);
 
-    const decoded = try snappy.decode(allocator, input);
-    defer allocator.free(decoded);
+    // const decoded = try snappy.decode(allocator, input);
+    // defer allocator.free(decoded);
 
-    try stdout.print("{}", .{decoded});
+    // try stdout.print("{}", .{decoded});
+
+    var encInput = try readFile(allocator, "encode");
+    const encoded = try snappy.encode(allocator, encInput);
+    defer allocator.free(encoded);
+    try stdout.print("{}", .{encoded});
 }
