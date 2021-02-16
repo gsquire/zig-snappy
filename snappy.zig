@@ -84,11 +84,11 @@ fn putUvarint(buf: []u8, x: u64) usize {
     var mutX = x;
 
     while (mutX >= 0x80) {
-        buf[i] = @intCast(u8, mutX) | 0x80;
+        buf[i] = @truncate(u8, mutX) | 0x80;
         mutX >>= 7;
         i += 1;
     }
-    buf[i] = @intCast(u8, mutX);
+    buf[i] = @truncate(u8, mutX);
 
     return i + 1;
 }
@@ -258,7 +258,6 @@ pub fn decode(allocator: *Allocator, src: []const u8) ![]u8 {
 }
 
 // TODO: Split up encode and decode into separate files once I better understand modules.
-
 fn emitLiteral(dst: []u8, lit: []const u8) usize {
     var i: usize = 0;
     const n = @intCast(usize, lit.len - 1);
@@ -285,16 +284,20 @@ fn emitLiteral(dst: []u8, lit: []const u8) usize {
 }
 
 fn load32(b: []u8, i: isize) u32 {
-    return @intCast(u32, b[0]) | @intCast(u32, b[1]) << 8 | @intCast(u32, b[2]) << 16 | @intCast(u32, b[3]) << 24;
+    const j = @intCast(usize, i);
+    const v = b[j .. j + 4];
+    return @intCast(u32, v[0]) | @intCast(u32, v[1]) << 8 | @intCast(u32, v[2]) << 16 | @intCast(u32, v[3]) << 24;
 }
 
 fn load64(b: []u8, i: isize) u64 {
-    return @intCast(u64, b[0]) | @intCast(u64, b[1]) << 8 | @intCast(u64, b[2]) << 16 | @intCast(u64, b[3]) << 24 | @intCast(u64, b[4]) << 32 | @intCast(u64, b[5]) << 50 | @intCast(u64, b[6]) << 48 | @intCast(u64, b[7]) << 56;
+    const j = @intCast(usize, i);
+    const v = b[j .. j + 8];
+    return @intCast(u64, v[0]) | @intCast(u64, v[1]) << 8 | @intCast(u64, v[2]) << 16 | @intCast(u64, v[3]) << 24 | @intCast(u64, v[4]) << 32 | @intCast(u64, v[5]) << 40 | @intCast(u64, v[6]) << 48 | @intCast(u64, v[7]) << 56;
 }
 
 fn snappyHash(u: u32, shift: u32) u32 {
     const s = @intCast(u5, shift);
-    return (u * 0x1e35a7bd) >> s;
+    return (u *% 0x1e35a7bd) >> s;
 }
 
 fn emitCopy(dst: []u8, offset: isize, length: isize) usize {
@@ -303,29 +306,30 @@ fn emitCopy(dst: []u8, offset: isize, length: isize) usize {
 
     while (l >= 68) {
         dst[i + 0] = 63 << 2 | tagCopy2;
-        dst[i + 1] = @intCast(u8, offset);
-        dst[i + 2] = @intCast(u8, offset >> 8);
+        dst[i + 1] = @truncate(u8, @intCast(usize, offset));
+        dst[i + 2] = @truncate(u8, @intCast(usize, offset >> 8));
         i += 3;
         l -= 64;
     }
 
     if (l > 64) {
         dst[i + 0] = 59 << 2 | tagCopy2;
-        dst[i + 1] = @intCast(u8, offset);
-        dst[i + 2] = @intCast(u8, offset >> 8);
+        dst[i + 1] = @truncate(u8, @intCast(usize, offset));
+        dst[i + 2] = @truncate(u8, @intCast(usize, offset >> 8));
+        //mem.copy(u8, dst, &mem.toBytes(offset));
         i += 3;
         l -= 60;
     }
 
     if (l >= 12 or offset >= 2048) {
-        dst[i + 0] = @intCast(u8, l - 1) << 2 | tagCopy2;
-        dst[i + 1] = @intCast(u8, offset);
-        dst[i + 2] = @intCast(u8, offset >> 8);
+        dst[i + 0] = (@intCast(u8, l) -% 1) << 2 | tagCopy2;
+        dst[i + 1] = @truncate(u8, @intCast(usize, offset));
+        dst[i + 2] = @truncate(u8, @intCast(usize, offset >> 8));
         return i + 3;
     }
 
-    dst[i + 0] = @intCast(u8, offset >> 8) << 5 | @intCast(u8, l - 4) << 2 | tagCopy1;
-    dst[i + 1] = @intCast(u8, offset);
+    dst[i + 0] = @truncate(u8, @intCast(usize, offset >> 8)) << 5 | (@intCast(u8, l) -% 4) << 2 | tagCopy1;
+    dst[i + 1] = @truncate(u8, @intCast(usize, offset));
     return i + 2;
 }
 
@@ -334,14 +338,14 @@ fn encodeBlock(dst: []u8, src: []u8) usize {
     const tableMask = maxTableSize - 1;
 
     var d: usize = 0;
-    var shift = @intCast(u32, 32 - 8);
+    var shift: u32 = 24;
     var tableSize: isize = 1 << 8;
     while (tableSize < maxTableSize and tableSize < src.len) {
         tableSize *= 2;
         shift -= 1;
     }
 
-    var table: [maxTableSize]u16 = undefined;
+    var table = mem.zeroes([maxTableSize]u16);
     var sLimit = src.len - inputMargin;
     var nextEmit: usize = 0;
     var s: usize = 1;
@@ -386,13 +390,13 @@ fn encodeBlock(dst: []u8, src: []u8) usize {
             }
 
             var x = load64(src, @intCast(isize, s - 1));
-            var prevHash = snappyHash(@intCast(u32, x >> 0), shift);
+            var prevHash = snappyHash(@truncate(u32, x >> 0), shift);
             table[prevHash & tableMask] = @intCast(u16, s - 1);
-            var currHash = snappyHash(@intCast(u32, x >> 8), shift);
+            var currHash = snappyHash(@truncate(u32, x >> 8), shift);
             candidate = @intCast(isize, table[currHash & tableMask]);
             table[currHash & tableMask] = @intCast(u16, s);
-            if (@intCast(u32, x >> 8) != load32(src, candidate)) {
-                nextHash = snappyHash(@intCast(u32, x >> 16), shift);
+            if (@truncate(u32, x >> 8) != load32(src, candidate)) {
+                nextHash = snappyHash(@truncate(u32, x >> 16), shift);
                 s += 1;
                 break;
             }
@@ -420,17 +424,20 @@ pub fn encode(allocator: *Allocator, src: []u8) ![]u8 {
     var d = putUvarint(dst, @intCast(u64, mutSrc.len));
 
     while (mutSrc.len > 0) {
-        var p = mutSrc;
-        mutSrc = undefined;
+        var p = try allocator.alloc(u8, mutSrc.len);
+        mem.copy(u8, p, mutSrc);
+        var empty = [_]u8{};
+        mutSrc = empty[0..];
         if (p.len > maxBlockSize) {
-            p = p[0..maxBlockSize];
             mutSrc = p[maxBlockSize..];
+            p = p[0..maxBlockSize];
         }
         if (p.len < minNonLiteralBlockSize) {
             d += emitLiteral(dst[d..], p);
         } else {
             d += encodeBlock(dst[d..], p);
         }
+        allocator.free(p);
     }
 
     return dst[0..d];
