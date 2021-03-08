@@ -30,6 +30,8 @@ pub fn main() !void {
     // try stdout.print("{}", .{decoded});
 
     var encInput = try readFile(allocator, "encode");
+    defer allocator.free(encInput);
+
     const encoded = try snappy.encode(allocator, encInput);
     defer allocator.free(encoded);
     try stdout.print("{}", .{encoded});
