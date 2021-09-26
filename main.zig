@@ -19,7 +19,7 @@ fn readFile(allocator: *Allocator, path: []const u8) ![]u8 {
 // A small sample application demonstrating how to decode a snappy block-formatted input.
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
-    const stdout = std.io.getStdOut().outStream();
+    const stdout = std.io.getStdOut().writer();
 
     // const input = try readFile(allocator, "input");
     // defer allocator.free(input);
@@ -34,5 +34,5 @@ pub fn main() !void {
 
     const encoded = try snappy.encode(allocator, encInput);
     defer allocator.free(encoded);
-    try stdout.print("{}", .{encoded});
+    try stdout.print("{s}", .{encoded});
 }

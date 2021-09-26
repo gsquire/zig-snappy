@@ -459,18 +459,18 @@ pub fn maxEncodedLen(srcLen: usize) isize {
 }
 
 test "snappy crc" {
-    testing.expect(crc("snappy") == 0x293d0c23);
+    try testing.expect(crc("snappy") == 0x293d0c23);
 }
 
 test "decoding variable integers" {
     // Taken from the block format description.
     const case1 = uvarint(&[_]u8{0x40});
-    testing.expect(case1.value == 64);
-    testing.expect(case1.bytesRead == 1);
+    try testing.expect(case1.value == 64);
+    try testing.expect(case1.bytesRead == 1);
 
     const case2 = uvarint(&[_]u8{ 0xfe, 0xff, 0x7f });
-    testing.expect(case2.value == 2097150);
-    testing.expect(case2.bytesRead == 3);
+    try testing.expect(case2.value == 2097150);
+    try testing.expect(case2.bytesRead == 3);
 }
 
 test "simple decode" {
@@ -480,5 +480,5 @@ test "simple decode" {
     const decoded = try decode(allocator, "\x19\x1coh snap,\x05\x06,py is cool!\x0a");
     defer allocator.free(decoded);
 
-    testing.expectEqualSlices(u8, decoded, "oh snap, snappy is cool!\n");
+    try testing.expectEqualSlices(u8, decoded, "oh snap, snappy is cool!\n");
 }
