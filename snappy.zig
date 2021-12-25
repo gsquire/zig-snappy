@@ -241,7 +241,7 @@ fn runDecode(dst: []u8, src: []const u8) u8 {
 
 /// Given a chosen allocator and the source input, decode it using the snappy block format. The
 /// returned slice must be freed.
-pub fn decode(allocator: *Allocator, src: []const u8) ![]u8 {
+pub fn decode(allocator: Allocator, src: []const u8) ![]u8 {
     const block = try decodedLen(src);
 
     var dst = try allocator.alloc(u8, block.blockLen);
@@ -411,7 +411,7 @@ fn encodeBlock(dst: []u8, src: []u8) usize {
 }
 
 /// Encode returns the encoded form of the source input. The returned slice must be freed.
-pub fn encode(allocator: *Allocator, src: []u8) ![]u8 {
+pub fn encode(allocator: Allocator, src: []u8) ![]u8 {
     var mutSrc = src;
     const encodedLen = maxEncodedLen(mutSrc.len);
     if (encodedLen < 0) {

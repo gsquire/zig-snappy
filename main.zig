@@ -4,7 +4,7 @@ const fs = std.fs;
 
 const snappy = @import("snappy.zig");
 
-fn readFile(allocator: *Allocator, path: []const u8) ![]u8 {
+fn readFile(allocator: Allocator, path: []const u8) ![]u8 {
     var f = try fs.cwd().openFile(path, fs.File.OpenFlags{ .read = true });
     const fMetadata = try f.stat();
 
