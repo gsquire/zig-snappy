@@ -1,11 +1,12 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const fs = std.fs;
+const file = fs.File;
 
 const snappy = @import("snappy.zig");
 
 fn readFile(allocator: Allocator, path: []const u8) ![]u8 {
-    var f = try fs.cwd().openFile(path, fs.File.OpenFlags{ .read = true });
+    var f = try fs.cwd().openFile(path, file.OpenFlags{ .mode = file.OpenMode.read_only });
     const fMetadata = try f.stat();
 
     var output = try allocator.alloc(u8, fMetadata.size);
