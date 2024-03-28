@@ -440,7 +440,11 @@ pub fn encode(allocator: Allocator, src: []u8) ![]u8 {
         allocator.free(p);
     }
 
-    return dst[0..d];
+    var output = try allocator.alloc(u8, d);
+    mem.copy(u8, output, dst[0..d]);
+    allocator.free(dst);
+
+    return output;
 }
 
 /// Return the maximum length of a snappy block, given the uncompressed length.
@@ -473,9 +477,19 @@ test "decoding variable integers" {
     try testing.expect(case2.bytesRead == 3);
 }
 
+test "simple encode" {
+    const allocator = testing.allocator;
+
+    var input: [4]u8 = [_]u8{ 't', 'h', 'i', 's' };
+    var i: []u8 = &input;
+    var output = try encode(allocator, i);
+    defer allocator.free(output);
+
+    try testing.expectEqualSlices(u8, output, "\x04\x0cthis");
+}
+
 test "simple decode" {
-    // TODO: Use the testing allocator?
-    const allocator = std.heap.page_allocator;
+    const allocator = testing.allocator;
 
     const decoded = try decode(allocator, "\x19\x1coh snap,\x05\x06,py is cool!\x0a");
     defer allocator.free(decoded);
